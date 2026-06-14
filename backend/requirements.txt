@@ -10,3 +10,5 @@ pydantic
 jinja2
 python-multipart
 groq
+PyJWT
+passlib[argon2]

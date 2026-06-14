@@ -6,23 +6,48 @@ AssessIQ is a modern, AI-powered examination platform designed to provide dynami
 
 - **Dynamic Question Generation**: Automatically generates unique exam questions across various topics and difficulty levels using the Groq API (Llama 3).
 - **AI Auto-Grading**: Evaluates subjective, essay-type answers and provides a score out of 10 along with constructive feedback.
-- **Real-Time Proctoring**: Utilizes WebSockets to stream video frames from the examinee's webcam to the backend. Analyzes frames using OpenCV and MediaPipe (Face Mesh) to detect suspicious behavior and issue warnings or terminate the exam if necessary.
+- **Real-Time Proctoring**: Client-side analysis using MediaPipe (Face Mesh) and Coco-SSD to detect suspicious behavior directly in the browser, minimizing server load. Utilizes WebSockets to relay lightweight alert payloads to the backend.
 - **Full-Stack Architecture**: Built with a robust FastAPI backend and a responsive HTML/CSS/JS frontend.
 - **Containerized**: Fully dockerized setup for easy deployment using Docker Compose.
 
 ## ⚙️ Core Architecture & Scalability
 
+```mermaid
+graph TD
+    subgraph Client [Frontend / Examinee Browser]
+        UI[Vanilla HTML/JS/CSS UI]
+        Cam[MediaPipe Face Mesh]
+        Coco[Coco-SSD Phone Detection]
+        UI --- Cam
+        UI --- Coco
+    end
+
+    subgraph Server [Backend / FastAPI]
+        API[REST API Endpoints]
+        WS[WebSocket Manager]
+        LLM[Groq LLaMA 3 Integration]
+        DB[(SQLite with WAL)]
+        
+        API <--> LLM
+        API <--> DB
+        WS <--> DB
+    end
+
+    Client -- "HTTP Requests (Exam Data)" --> API
+    Client -- "WebSocket Alerts" --> WS
+```
+
 **Frontend**: HTML/JS/CSS (Vanilla) with Chart.js for visualization.
-**Backend**: FastAPI, SQLite, WebSockets for real-time streaming.
+**Backend**: FastAPI, SQLite, WebSockets for lightweight, real-time alerting.
 **AI Integration**: Groq API (Llama 3 models) for instantaneous question generation and subjective grading.
 
 > **Note on Architecture:** For the Hackathon MVP, we are utilizing FastAPI's native `BackgroundTasks` and in-memory LRU caching (`functools`) to guarantee sub-50ms API responses without the deployment overhead of extra containers. In a production environment, this architecture is fully decoupled and ready to scale using **Redis** for distributed caching and **Celery/BullMQ** for asynchronous AI job queues.
-
 ## Tech Stack
 
 ### Backend
 - **Framework**: FastAPI
 - **Database**: SQLite with SQLAlchemy ORM
+- **Authentication**: JWT authentication with Passlib (Argon2)
 - **AI Integrations**: Groq API (Llama-3 models)
 - **Computer Vision**: OpenCV, MediaPipe
 - **Real-time Communication**: WebSockets
@@ -95,9 +120,14 @@ The easiest way to run AssessIQ is using Docker Compose. This will build both th
 ## API Endpoints
 
 - `GET /api/status`: Check the status of the API.
+- `POST /api/auth/login`: Authenticate user and receive JWT token.
+- `POST /api/auth/register`: Register a new user account.
 - `GET /api/exams`: Retrieve a list of all available exams.
 - `GET /api/questions?topic={topic}&difficulty={difficulty}`: Generate exam questions dynamically.
 - `POST /api/grade`: Auto-grade subjective and essay-type answers.
+- `POST /api/exam/start`: Start an exam session.
+- `POST /api/exam/autosave`: Autosave exam answers.
+- `POST /api/exam/terminate`: Terminate an exam due to security violations.
 - `WS /ws/proctoring`: WebSocket endpoint for real-time video frame analysis.
 
 ## Project Structure
@@ -106,6 +136,8 @@ The easiest way to run AssessIQ is using Docker Compose. This will build both th
 .
 ├── backend/
 │   ├── .env.example        # Example environment variables
+│   ├── auth.py             # JWT authentication and user management
+│   ├── config.py           # Application configuration settings
 │   ├── database.py         # Database connection setup
 │   ├── grading.py          # AI auto-grading and question generation logic
 │   ├── init_db.py          # Script to initialize database with mock data

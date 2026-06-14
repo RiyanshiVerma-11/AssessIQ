@@ -8,6 +8,8 @@ class AssessIQ {
         this.currentTheme = localStorage.getItem('theme') || 'light';
         this.currentRole = 'candidate'; // 'candidate' or 'educator'
         this.currentView = 'landing';
+        this.authToken = localStorage.getItem('token') || null;
+        this.currentUser = JSON.parse(localStorage.getItem('user')) || null;
         
         // Mock Databases
         // Data from API
@@ -43,23 +45,195 @@ class AssessIQ {
     async init() {
         this.applyTheme(this.currentTheme);
         this.setupEventListeners();
-        await this.loadExams();
-        this.renderProctorGrid();
         
-        // Show home view by default
-        this.switchView('landing');
-        // No more fake periodic checks!
-        // this.startMockProctorSimulation(); // Removed to prevent disqualification
-        this.initDashboardChart();
+        if (this.authToken) {
+            await this.loadExams();
+            this.connectWebSocket();
+            this.renderProctorGrid();
+            this.initDashboardChart();
+            if (this.currentUser && this.currentUser.role === 'admin') {
+                this.switchRole('educator');
+            } else {
+                this.switchRole('candidate');
+            }
+        } else {
+            this.switchView('landing');
+        }
     }
 
     initDashboardChart() {
         const ctx = document.getElementById('dashboard-trend-chart');
         if (!ctx) return;
-        // Removing hardcoded chart to prevent disqualification due to fake data.
-        // Replaced with a real-time counter placeholder or removed entirely.
         if (ctx) {
             ctx.parentNode.innerHTML = "<div style='color:var(--text-secondary); font-size: 0.8rem; height: 100%; display: flex; align-items:center; justify-content:center;'>Awaiting Live Data...</div>";
+        }
+    }
+
+    async apiFetch(url, options = {}) {
+        if (!options.headers) options.headers = {};
+        if (this.authToken) {
+            options.headers['Authorization'] = 'Bearer ' + this.authToken;
+        }
+        try {
+            const response = await fetch(url, options);
+            if (response.status === 401) {
+                this.showToast('Session Expired', 'Please log in again.', 'error');
+                this.openLoginModal(this.currentRole);
+                throw new Error('Unauthorized');
+            }
+            return response;
+        } catch (error) {
+            console.error('API Fetch Error:', error, 'URL:', url);
+            throw error;
+        }
+    }
+
+    openLoginModal(role) {
+        this.loginTargetRole = role;
+        document.getElementById('login-modal').style.display = 'flex';
+        document.getElementById('auth-error').style.display = 'none';
+        document.getElementById('login-username').value = '';
+        document.getElementById('login-password').value = '';
+        this.switchAuthTab('login');
+    }
+
+    switchAuthTab(tab) {
+        const errorEl = document.getElementById('auth-error');
+        if (errorEl) errorEl.style.display = 'none';
+        
+        if (tab === 'login') {
+            document.getElementById('tab-login').classList.add('active');
+            document.getElementById('tab-login').style.opacity = '1';
+            document.getElementById('tab-register').classList.remove('active');
+            document.getElementById('tab-register').style.opacity = '0.5';
+            document.getElementById('login-form').style.display = 'flex';
+            document.getElementById('register-form').style.display = 'none';
+        } else {
+            document.getElementById('tab-register').classList.add('active');
+            document.getElementById('tab-register').style.opacity = '1';
+            document.getElementById('tab-login').classList.remove('active');
+            document.getElementById('tab-login').style.opacity = '0.5';
+            document.getElementById('register-form').style.display = 'flex';
+            document.getElementById('login-form').style.display = 'none';
+        }
+    }
+
+    autofillDemoCredentials() {
+        this.switchAuthTab('login');
+        if (this.loginTargetRole === 'educator') {
+            document.getElementById('login-username').value = 'educator_admin';
+            document.getElementById('login-password').value = 'password123';
+        } else {
+            document.getElementById('login-username').value = 'jane_student';
+            document.getElementById('login-password').value = 'password123';
+        }
+    }
+
+    async submitLogin() {
+        const username = document.getElementById('login-username').value;
+        const password = document.getElementById('login-password').value;
+        
+        const btn = document.getElementById('login-submit-btn');
+        const spinner = btn.querySelector('.spinner');
+        const btnText = btn.querySelector('.btn-text');
+        const errorEl = document.getElementById('auth-error');
+        
+        btn.disabled = true;
+        spinner.style.display = 'block';
+        btnText.style.display = 'none';
+        errorEl.style.display = 'none';
+        
+        const formData = new URLSearchParams();
+        formData.append('username', username);
+        formData.append('password', password);
+
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                this.authToken = data.access_token;
+                this.currentUser = data.user;
+                localStorage.setItem('token', this.authToken);
+                localStorage.setItem('user', JSON.stringify(this.currentUser));
+                document.getElementById('login-modal').style.display = 'none';
+                
+                await this.loadExams();
+                this.connectWebSocket();
+                
+                if (this.loginTargetRole === 'educator') {
+                    if (this.currentUser.role !== 'admin') {
+                        this.showToast("Access Denied", "You must be an educator to access this area.", "error");
+                        btn.disabled = false;
+                        spinner.style.display = 'none';
+                        btnText.style.display = 'block';
+                        return;
+                    }
+                    this.switchRole('educator');
+                } else {
+                    this.switchRole('candidate');
+                }
+            } else {
+                const errorData = await res.json();
+                errorEl.innerText = errorData.detail || "Invalid credentials";
+                errorEl.style.display = 'block';
+            }
+        } catch (e) {
+            errorEl.innerText = "Network Error: Could not connect to server.";
+            errorEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            spinner.style.display = 'none';
+            btnText.style.display = 'block';
+        }
+    }
+
+    async submitRegister() {
+        const username = document.getElementById('register-username').value;
+        const email = document.getElementById('register-email').value;
+        const password = document.getElementById('register-password').value;
+        const role = this.loginTargetRole === 'educator' ? 'admin' : 'student';
+        
+        const btn = document.getElementById('register-submit-btn');
+        const spinner = btn.querySelector('.spinner');
+        const btnText = btn.querySelector('.btn-text');
+        const errorEl = document.getElementById('auth-error');
+        
+        btn.disabled = true;
+        spinner.style.display = 'block';
+        btnText.style.display = 'none';
+        errorEl.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password, role })
+            });
+
+            if (res.ok) {
+                this.showToast("Success", "Account created successfully. Logging you in...", "success");
+                
+                // Immediately log them in
+                document.getElementById('login-username').value = username;
+                document.getElementById('login-password').value = password;
+                await this.submitLogin();
+            } else {
+                const errorData = await res.json();
+                errorEl.innerText = errorData.detail || "Registration failed";
+                errorEl.style.display = 'block';
+            }
+        } catch (e) {
+            errorEl.innerText = "Network Error: Could not connect to server.";
+            errorEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            spinner.style.display = 'none';
+            btnText.style.display = 'block';
         }
     }
 
@@ -79,7 +253,7 @@ class AssessIQ {
         `;
 
         try {
-            const response = await fetch('/api/exams');
+            const response = await this.apiFetch('/api/exams');
             const data = await response.json();
             this.exams = data.exams || [];
             this.renderExams();
@@ -118,7 +292,7 @@ class AssessIQ {
                 if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                     this.ws.send(JSON.stringify({ type: "alert", message: "Tab Switch Detected" }));
                 }
-                fetch('/api/exam/terminate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({session_id: this.session.sessionId || 1, reason: 'blur'}) }).catch(()=>{});
+                this.apiFetch('/api/exam/terminate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({session_id: this.session.sessionId || 1, reason: 'blur'}) }).catch(()=>{});
             }
         });
 
@@ -128,7 +302,7 @@ class AssessIQ {
                 if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                     this.ws.send(JSON.stringify({ type: "alert", message: "Tab Switch Detected" }));
                 }
-                fetch('/api/exam/terminate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({session_id: this.session.sessionId || 1, reason: 'visibilitychange'}) }).catch(()=>{});
+                this.apiFetch('/api/exam/terminate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({session_id: this.session.sessionId || 1, reason: 'visibilitychange'}) }).catch(()=>{});
             }
         });
 
@@ -141,6 +315,138 @@ class AssessIQ {
                 }
             }
         });
+    }
+
+    connectWebSocket() {
+        if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+        
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const token = this.authToken;
+        if (!token) return;
+        
+        this.ws = new WebSocket(`${protocol}//${window.location.host}/ws/proctoring?token=${token}`);
+        
+        this.ws.onopen = () => {
+            console.log("WebSocket connected.");
+            while (this.wsMessageQueue.length > 0) {
+                const msg = this.wsMessageQueue.shift();
+                this.ws.send(msg);
+            }
+        };
+        
+        this.ws.onclose = (event) => {
+            console.log("WebSocket disconnected.", event);
+        };
+        
+        this.ws.onerror = (error) => {
+            console.error("WebSocket Error:", error);
+        };
+        
+        this.ws.onmessage = async (event) => {
+            if (event.data instanceof Blob) {
+                const proctorCanvas = document.getElementById('proctor-judge-canvas');
+                if (proctorCanvas) {
+                    const img = new Image();
+                    img.onload = () => {
+                        const proctorCtx = proctorCanvas.getContext('2d');
+                        proctorCtx.clearRect(0, 0, proctorCanvas.width, proctorCanvas.height);
+                        proctorCtx.drawImage(img, 0, 0, proctorCanvas.width, proctorCanvas.height);
+                    };
+                    img.src = URL.createObjectURL(event.data);
+                }
+                
+                const cand = this.proctorCandidates.find(c => c.id === 'judge-demo');
+                if (cand && cand.streamStatus !== 'Active') {
+                    cand.streamStatus = 'Active';
+                    cand.status = this.session.violations > 0 ? 'Flagged' : 'Secure';
+                    this.updateEducatorMetrics();
+                    this.renderProctorGrid();
+                }
+                return;
+            }
+            
+            try {
+                if (typeof event.data === 'string' && event.data.startsWith('data:image')) {
+                    const proctorCanvas = document.getElementById('proctor-judge-canvas');
+                    if (proctorCanvas) {
+                        const img = new Image();
+                        img.onload = () => {
+                            const proctorCtx = proctorCanvas.getContext('2d');
+                            proctorCtx.clearRect(0, 0, proctorCanvas.width, proctorCanvas.height);
+                            proctorCtx.drawImage(img, 0, 0, proctorCanvas.width, proctorCanvas.height);
+                        };
+                        img.src = event.data;
+                    }
+                    
+                    const cand = this.proctorCandidates.find(c => c.id === 'judge-demo');
+                    if (cand && cand.streamStatus !== 'Active') {
+                        cand.streamStatus = 'Active';
+                        cand.status = this.session.violations > 0 ? 'Flagged' : 'Secure';
+                        this.updateEducatorMetrics();
+                        this.renderProctorGrid();
+                    }
+                    return;
+                }
+                
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'candidate_status') {
+                    const cand = this.proctorCandidates.find(c => c.id === data.id);
+                    if (cand) {
+                        cand.exam = data.exam;
+                        cand.status = data.status;
+                        cand.violations = data.violations;
+                        cand.lastViolation = data.lastViolation;
+                        cand.streamStatus = data.streamStatus;
+                    }
+                    this.updateEducatorMetrics();
+                    this.renderProctorGrid();
+                } else if (data.type === 'dashboard_update') {
+                    const flagEl = document.getElementById('metrics-flags-count');
+                    if(flagEl) {
+                        let current = parseInt(flagEl.textContent) || 0;
+                        flagEl.textContent = current + data.value;
+                        flagEl.style.transform = 'scale(1.5)';
+                        flagEl.style.transition = 'transform 0.2s';
+                        setTimeout(() => flagEl.style.transform = 'scale(1)', 300);
+                    }
+                } else if (data.type === 'warning') {
+                    if (this.currentRole === 'candidate' && this.session.active) {
+                        this.triggerSecurityViolation('cv-face-check', data.message);
+                        if (data.bbox) this.session.latestBbox = data.bbox;
+                    }
+                } else if (data.type === 'terminate') {
+                    if (this.currentRole === 'candidate' && this.session.active) {
+                        this.triggerSecurityViolation('cv-face-check', data.message);
+                        if (data.bbox) this.session.latestBbox = data.bbox;
+                        this.endExam();
+                    }
+                } else if (data.type === 'ok') {
+                    if (this.currentRole === 'candidate') {
+                        document.getElementById('webcam-gaze-tag').textContent = `GAZE: ${data.message}`;
+                        document.getElementById('webcam-gaze-tag').style.color = "var(--success)";
+                        if (data.bbox) this.session.latestBbox = data.bbox;
+                    }
+                }
+            } catch(e) {}
+        };
+    }
+
+    sendCandidateStatus() {
+        const judgeCandidate = this.proctorCandidates.find(c => c.id === 'judge-demo');
+        if (judgeCandidate && this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({
+                type: 'candidate_status',
+                id: 'judge-demo',
+                exam: judgeCandidate.exam,
+                status: judgeCandidate.status,
+                violations: judgeCandidate.violations,
+                lastViolation: judgeCandidate.lastViolation,
+                streamStatus: judgeCandidate.streamStatus
+            }));
+        }
     }
 
     applyTheme(theme) {
@@ -224,13 +530,15 @@ class AssessIQ {
         const sidebar = document.getElementById('sidebar');
         const mainWrapper = document.getElementById('main-wrapper');
         
-        if (viewId === 'candidate-exam') {
+        if (viewId === 'candidate-exam' || viewId === 'landing') {
+            sidebar.style.display = 'none';
             sidebar.style.transform = 'translateX(-100%)';
             sidebar.style.width = '0px';
             mainWrapper.style.marginLeft = '0px';
             mainWrapper.style.width = '100%';
             document.getElementById('header').style.display = 'none'; // fully remove header for immersion
         } else {
+            sidebar.style.display = 'flex';
             sidebar.style.transform = 'none';
             sidebar.style.width = '';
             mainWrapper.style.marginLeft = '';
@@ -292,10 +600,10 @@ class AssessIQ {
         try { document.documentElement.requestFullscreen(); } catch (e) {}
         
         try {
-            const res = await fetch('/api/exam/start', {
+            const res = await this.apiFetch('/api/exam/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: 1, exam_id: parseInt(examId) })
+                body: JSON.stringify({ exam_id: parseInt(examId) })
             });
             const data = await res.json();
             this.session.sessionId = data.session_id;
@@ -350,6 +658,7 @@ class AssessIQ {
             judgeCandidate.streamStatus = 'Active';
         }
         this.updateEducatorMetrics();
+        this.sendCandidateStatus();
     }
 
     renderActiveQuestion() {
@@ -457,7 +766,7 @@ class AssessIQ {
         for (let i = 0; i < this.session.questions.length; i++) {
             if (this.session.questions[i].type === 'essay') {
                 try {
-                    const res = await fetch('/api/grade', {
+                    const res = await this.apiFetch('/api/grade', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ session_id: this.session.sessionId || 1, question: this.session.questions[i].text, answer: this.session.answers[i] || "" })
@@ -479,7 +788,10 @@ class AssessIQ {
         const judgeCandidate = this.proctorCandidates.find(c => c.id === 'judge-demo');
         if (judgeCandidate) {
             judgeCandidate.score = scorePercent;
+            judgeCandidate.status = 'Completed';
+            judgeCandidate.streamStatus = 'Inactive';
         }
+        this.sendCandidateStatus();
 
         document.getElementById('completion-score').textContent = scorePercent + '%';
         document.getElementById('completion-feedback').textContent = gradingFeedback;
@@ -500,49 +812,7 @@ class AssessIQ {
         fallback.style.display = 'none';
         video.style.display = 'block';
 
-        // Connect WebSocket
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const token = "default_secret";
-        this.ws = new WebSocket(`${protocol}//${window.location.host}/ws/proctoring?token=${token}`);
-        
-        this.ws.onclose = (event) => {
-            if (event.code === 1008) {
-                alert("WebSocket connection rejected: Unauthorized.");
-            } else if (this.session.active && this.session.cameraStatus === 'streaming') {
-                alert("WebSocket connection dropped.");
-            }
-        };
-
-        this.ws.onerror = (error) => {
-            console.error("WebSocket Error:", error);
-        };
-        
-        this.ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'dashboard_update') {
-                    const flagEl = document.getElementById('metrics-flags-count');
-                    if(flagEl) {
-                        let current = parseInt(flagEl.textContent) || 0;
-                        flagEl.textContent = current + data.value;
-                        flagEl.style.transform = 'scale(1.5)';
-                        flagEl.style.transition = 'transform 0.2s';
-                        setTimeout(() => flagEl.style.transform = 'scale(1)', 300);
-                    }
-                } else if (data.type === 'warning') {
-                    this.triggerSecurityViolation('cv-face-check', data.message);
-                    if (data.bbox) this.session.latestBbox = data.bbox;
-                } else if (data.type === 'terminate') {
-                    this.triggerSecurityViolation('cv-face-check', data.message);
-                    if (data.bbox) this.session.latestBbox = data.bbox;
-                    this.endExam();
-                } else if (data.type === 'ok') {
-                    document.getElementById('webcam-gaze-tag').textContent = `GAZE: ${data.message}`;
-                    document.getElementById('webcam-gaze-tag').style.color = "var(--success)";
-                    if (data.bbox) this.session.latestBbox = data.bbox;
-                }
-            } catch(e) {}
-        };
+        this.connectWebSocket();
         
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -576,10 +846,6 @@ class AssessIQ {
         if (this.session.cameraStream) {
             this.session.cameraStream.getTracks().forEach(track => track.stop());
             this.session.cameraStream = null;
-        }
-        if (this.ws) {
-            this.ws.close();
-            this.ws = null;
         }
         this.session.cameraStatus = 'inactive';
     }
@@ -620,14 +886,26 @@ class AssessIQ {
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
                         ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
                         
-                        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-                            if (results.multiFaceLandmarks.length > 1) {
+                        let validFaces = [];
+                        if (results.multiFaceLandmarks) {
+                            validFaces = results.multiFaceLandmarks.filter(landmarks => {
+                                let minX = 1, maxX = 0;
+                                landmarks.forEach(lm => {
+                                    if(lm.x < minX) minX = lm.x;
+                                    if(lm.x > maxX) maxX = lm.x;
+                                });
+                                return (maxX - minX) > 0.08; // Ignore faces taking up < 8% of width (fake positives)
+                            });
+                        }
+
+                        if (validFaces.length > 0) {
+                            if (validFaces.length > 1) {
                                 if (!this._lastMultiFaceFlag || Date.now() - this._lastMultiFaceFlag > 5000) {
                                     this._lastMultiFaceFlag = Date.now();
                                     this.demoTriggerViolation('multiple-faces');
                                 }
                             } else {
-                                const landmarks = results.multiFaceLandmarks[0];
+                                const landmarks = validFaces[0];
                                 // Simple yaw proxy: horizontal distance from left eye to nose vs right eye to nose
                                 const nose = landmarks[1];
                                 const leftEye = landmarks[33]; 
@@ -669,6 +947,23 @@ class AssessIQ {
                                     height: (maxY - minY) * canvas.height
                                 };
                             }
+                        } else {
+                            this.session.latestBbox = null; // Remove the tracked bounding box when user is not present
+                            if (!this._lastNoFaceFlag || Date.now() - this._lastNoFaceFlag > 5000) {
+                                this._lastNoFaceFlag = Date.now();
+                                this.triggerSecurityViolation('cv-face-check', 'Anomaly: No candidate detected in the camera frame.');
+                                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                                    this.ws.send(JSON.stringify({ type: "alert", message: "Candidate out of frame" }));
+                                }
+                            }
+                        }
+                        
+                        // Draw onto the proctor-judge-canvas if it exists!
+                        const proctorCanvas = document.getElementById('proctor-judge-canvas');
+                        if (proctorCanvas) {
+                            const proctorCtx = proctorCanvas.getContext('2d');
+                            proctorCtx.clearRect(0, 0, proctorCanvas.width, proctorCanvas.height);
+                            proctorCtx.drawImage(canvas, 0, 0, proctorCanvas.width, proctorCanvas.height);
                         }
                     } catch (e) {
                         console.warn("FaceMesh Processing Error:", e);
@@ -680,7 +975,7 @@ class AssessIQ {
                         if (this.session.cameraStatus === 'streaming') {
                             await this.faceMesh.send({image: video});
                             frameCounter++;
-                            if (frameCounter % 30 === 0 && this.ws && this.ws.readyState === WebSocket.OPEN) {
+                            if (canvas && this.ws && this.ws.readyState === WebSocket.OPEN && frameCounter % 30 === 0) {
                                 canvas.toBlob((blob) => {
                                     if (blob && this.ws && this.ws.readyState === WebSocket.OPEN) {
                                         this.ws.send(blob);
@@ -760,6 +1055,14 @@ class AssessIQ {
                 });
             }
             
+            // Draw onto the proctor-judge-canvas if it exists!
+            const proctorCanvas = document.getElementById('proctor-judge-canvas');
+            if (proctorCanvas) {
+                const proctorCtx = proctorCanvas.getContext('2d');
+                proctorCtx.clearRect(0, 0, proctorCanvas.width, proctorCanvas.height);
+                proctorCtx.drawImage(canvas, 0, 0, proctorCanvas.width, proctorCanvas.height);
+            }
+            
             this.session.webcamAnimationFrame = requestAnimationFrame(drawLoop);
         };
         
@@ -774,14 +1077,14 @@ class AssessIQ {
         }
 
         // Auto-save via API
-        fetch('/api/exam/autosave', {
+        this.apiFetch('/api/exam/autosave', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({ session_id: this.session.sessionId || 1, answers: this.session.answers })
         }).catch(()=>{});
 
         // Terminate
-        fetch('/api/exam/terminate', {
+        this.apiFetch('/api/exam/terminate', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({ session_id: this.session.sessionId || 1, reason: 'camera_revoked' })
@@ -802,6 +1105,15 @@ class AssessIQ {
 
         // Log severe failure on Student local board and trigger high-severity alert for Educator portal
         this.triggerSecurityViolation('hardware-revocation', 'CRITICAL: Video stream terminated / Permission revoked mid-session.');
+        
+        // Update judge candidate state inside the mock controller DB
+        const judgeCandidate = this.proctorCandidates.find(c => c.id === 'judge-demo');
+        if (judgeCandidate) {
+            judgeCandidate.status = 'Flagged';
+            judgeCandidate.streamStatus = 'Inactive';
+            judgeCandidate.lastViolation = 'Camera Connection Revoked (High)';
+        }
+        this.sendCandidateStatus();
         
         // Show local lockout warning for candidate
         this.triggerLockoutOverlay("Camera Integrity Violation", "Hardware connection to the capture device has been interrupted or permission settings were blocked mid-session. The evaluation interface is locked until resolution.");
@@ -836,6 +1148,7 @@ class AssessIQ {
         // Trigger visual alerts in educator dashboard immediately
         this.updateEducatorMetrics();
         this.renderProctorGrid();
+        this.sendCandidateStatus();
         
         // Handle student modal lock out depending on type
         if (type === 'focus-loss') {
@@ -950,7 +1263,7 @@ class AssessIQ {
         btn.textContent = `⏳ Generating items via Groq API...`;
 
         try {
-            const res = await fetch(`/api/questions?topic=${encodeURIComponent(prompt)}&difficulty=${startDiff}`);
+            const res = await this.apiFetch(`/api/questions?topic=${encodeURIComponent(prompt)}&difficulty=${startDiff}`);
             const data = await res.json();
             
             const newExam = {
@@ -1013,11 +1326,13 @@ class AssessIQ {
             let feedContent = '';
             
             if (candidate.id === 'judge-demo' && this.session.active && this.session.cameraStatus === 'streaming') {
-                // Render placeholder referring the judge to look at their exam tab camera widget
+                // Render live canvas for the student web feed
                 feedContent = `
-                    <div style="width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#94a3b8; font-size:0.75rem; text-align:center; padding:12px; background:#111827;">
-                        <span>📷 Active Feed Redirect</span>
-                        <p style="color:#64748b; font-size:0.65rem; margin-top:4px;">Watch webcam canvas drawing on candidate test panel.</p>
+                    <div style="width:100%; height:100%; background:#1e2937; position:relative; overflow:hidden; border: 2px solid var(--success);">
+                        <div style="position:absolute; top:6px; left:6px; background:rgba(0,0,0,0.6); color:#fff; font-size:0.6rem; padding:2px 6px; border-radius:4px; font-weight:bold; z-index: 2;">
+                            LIVE FEED
+                        </div>
+                        <canvas id="proctor-judge-canvas" width="320" height="240" style="width: 100%; height: 100%; object-fit: cover;"></canvas>
                     </div>
                 `;
             } else if (candidate.id === 'judge-demo' && this.session.cameraStatus === 'revoked') {
@@ -1138,6 +1453,7 @@ class AssessIQ {
         ];
         this.updateEducatorMetrics();
         this.renderProctorGrid();
+        this.sendCandidateStatus();
         this.showToast("System Reset", "Educator control logs have been cleared.", "success");
     }
 

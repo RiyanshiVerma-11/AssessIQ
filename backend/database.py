@@ -14,8 +14,9 @@ engine = create_engine(
 @event.listens_for(engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA synchronous=NORMAL")
+    # Using DELETE journal mode instead of WAL because WAL mode shared-memory (.shm) file
+    # locking is unsupported on Docker volume mounts from Windows hosts.
+    cursor.execute("PRAGMA journal_mode=DELETE")
     cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

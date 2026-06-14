@@ -1,13 +1,14 @@
 import json
 import os
 import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Response, BackgroundTasks, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Response, BackgroundTasks, HTTPException, Query
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, Field
-import models, database, proctoring, grading, init_db
+import models, database, proctoring, grading, init_db, auth
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -46,12 +47,53 @@ class GradeRequest(BaseModel):
     question: str = Field(..., max_length=1000)
     answer: str = Field(..., max_length=5000)
 
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    email: str = Field(..., min_length=5, max_length=100)
+    password: str = Field(..., min_length=6)
+    role: str = "student"
+
 @app.get("/api/status")
 def read_root():
     return {"message": "Intelligent Examinations API is running"}
 
+@app.post("/api/auth/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.username == form_data.username).first()
+    if not user or not auth.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+    
+    access_token = auth.create_access_token(data={"sub": user.username, "role": user.role})
+    return {"access_token": access_token, "token_type": "bearer", "user": {"id": user.id, "username": user.username, "role": user.role}}
+
+@app.post("/api/auth/register")
+def register(req: RegisterRequest, db: Session = Depends(get_db)):
+    # Check if username exists
+    existing_user = db.query(models.User).filter(models.User.username == req.username).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    # Check if email exists
+    existing_email = db.query(models.User).filter(models.User.email == req.email).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
+        
+    hashed_pwd = auth.get_password_hash(req.password)
+    
+    new_user = models.User(
+        username=req.username,
+        email=req.email,
+        hashed_password=hashed_pwd,
+        role=req.role
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    return {"message": "User registered successfully"}
+
 @app.get("/api/exams")
-def get_exams(db: Session = Depends(get_db)):
+def get_exams(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     exams = db.query(models.Exam).all()
     # Format exams for the frontend
     result = []
@@ -90,10 +132,12 @@ def get_questions(response: Response, topic: str = "Computer Science", difficult
     return {"questions": questions}
 
 @app.post("/api/grade")
-def grade_answer(req: GradeRequest, db: Session = Depends(get_db)):
+def grade_answer(req: GradeRequest, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     session = db.query(models.ExamResult).filter(models.ExamResult.id == req.session_id).first()
     if not session or session.status == "TERMINATED":
         return {"score": 0, "feedback": "Evaluation blocked. Exam was terminated due to security violations."}
+    if current_user.role != "admin" and session.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden. Session belongs to another user.")
     result = grading.auto_grade_answer(req.question, req.answer)
     return result
 
@@ -109,24 +153,41 @@ class ConnectionManager:
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
             
-    async def broadcast(self, message: dict):
+    async def broadcast(self, message):
         for connection in self.active_connections:
             try:
-                await connection.send_text(json.dumps(message))
+                if isinstance(message, dict):
+                    await connection.send_text(json.dumps(message))
+                elif isinstance(message, str):
+                    await connection.send_text(message)
+                else:
+                    await connection.send_bytes(message)
             except Exception:
                 pass
+
+    async def broadcast_except(self, message, sender: WebSocket):
+        for connection in self.active_connections:
+            if connection != sender:
+                try:
+                    if isinstance(message, dict):
+                        await connection.send_text(json.dumps(message))
+                    elif isinstance(message, str):
+                        await connection.send_text(message)
+                    else:
+                        await connection.send_bytes(message)
+                except Exception:
+                    pass
 
 manager = ConnectionManager()
 
 # --- STATE MACHINE ENDPOINTS ---
 class ExamSessionRequest(BaseModel):
-    user_id: int = 1 # mock user default
     exam_id: int
 
 @app.post("/api/exam/start")
-def start_exam(req: ExamSessionRequest, db: Session = Depends(get_db)):
+def start_exam(req: ExamSessionRequest, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     # Start state machine
-    result = models.ExamResult(user_id=req.user_id, exam_id=req.exam_id, status="ACTIVE")
+    result = models.ExamResult(user_id=current_user.id, exam_id=req.exam_id, status="ACTIVE")
     db.add(result)
     db.commit()
     db.refresh(result)
@@ -137,10 +198,12 @@ class ExamSaveRequest(BaseModel):
     answers: dict = {}
 
 @app.post("/api/exam/autosave")
-def autosave_exam(req: ExamSaveRequest, db: Session = Depends(get_db)):
+def autosave_exam(req: ExamSaveRequest, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     session = db.query(models.ExamResult).filter(models.ExamResult.id == req.session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    if session.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden. Session belongs to another user.")
     if session.status in ["TERMINATED", "COMPLETED"]:
         raise HTTPException(status_code=403, detail="Forbidden. Exam was terminated or completed.")
     
@@ -151,9 +214,11 @@ class ExamTerminateRequest(BaseModel):
     reason: str
 
 @app.post("/api/exam/terminate")
-async def terminate_exam(req: ExamTerminateRequest, db: Session = Depends(get_db)):
+async def terminate_exam(req: ExamTerminateRequest, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     session = db.query(models.ExamResult).filter(models.ExamResult.id == req.session_id).first()
     if session:
+        if current_user.role != "admin" and session.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Forbidden. Cannot terminate another user's session.")
         session.status = "TERMINATED"
         session.proctoring_alerts += 1
         db.commit()
@@ -162,24 +227,31 @@ async def terminate_exam(req: ExamTerminateRequest, db: Session = Depends(get_db
     return {"message": "Exam terminated"}
 
 @app.websocket("/ws/proctoring")
-async def websocket_endpoint(websocket: WebSocket, token: str = None):
-    if token != os.environ.get("SECRET_KEY", "default_secret"):
+async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
+    try:
+        payload = auth.decode_access_token(token)
+    except Exception:
         await websocket.close(code=1008)
         return
     await manager.connect(websocket)
-    alerts = 0
     try:
         while True:
-            data = await websocket.receive_text()
-            
-            if data.startswith("{"):
-                try:
-                    payload = json.loads(data)
-                    if payload.get("type") == "alert":
-                        await manager.broadcast({"type": "dashboard_update", "metric": "active_flags", "value": 1})
-                except Exception:
-                    pass
-                
+            message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                raise WebSocketDisconnect(code=message.get("code", 1000))
+            if "text" in message:
+                text_data = message["text"]
+                if text_data.startswith("{"):
+                    try:
+                        data = json.loads(text_data)
+                        if data.get("type") == "alert":
+                            await manager.broadcast({"type": "dashboard_update", "metric": "active_flags", "value": 1})
+                    except Exception:
+                        pass
+                await manager.broadcast_except(text_data, websocket)
+            elif "bytes" in message:
+                bytes_data = message["bytes"]
+                await manager.broadcast_except(bytes_data, websocket)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 

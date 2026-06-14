@@ -1,12 +1,13 @@
-import database, models
+import database, models, auth
 from datetime import datetime, timedelta
 
 def seed_data(db):
     try:
         print("Seeding MVP Mock Data...")
+        default_password = auth.get_password_hash("password123")
         # Create users
-        admin = models.User(username="educator_admin", role="admin")
-        student = models.User(username="jane_student", role="student")
+        admin = models.User(username="educator_admin", hashed_password=default_password, role="admin")
+        student = models.User(username="jane_student", hashed_password=default_password, role="student")
         db.add(admin)
         db.add(student)
         db.commit()
@@ -41,10 +42,10 @@ def seed_data(db):
 
         # Add additional mock users for logs
         students = [
-            models.User(username="alice_sec", role="student"),
-            models.User(username="bob_data", role="student"),
-            models.User(username="charlie_ai", role="student"),
-            models.User(username="david_test", role="student")
+            models.User(username="alice_sec", hashed_password=default_password, role="student"),
+            models.User(username="bob_data", hashed_password=default_password, role="student"),
+            models.User(username="charlie_ai", hashed_password=default_password, role="student"),
+            models.User(username="david_test", hashed_password=default_password, role="student")
         ]
         db.add_all(students)
         db.commit()

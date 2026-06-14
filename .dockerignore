@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+assessiq.db
+.env
+.git/
+frontend/node_modules/

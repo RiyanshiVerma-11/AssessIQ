@@ -1,0 +1,22 @@
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+.venv/
+
+# Database
+*.db
+*.sqlite3
+assessiq.db
+
+# OS Files
+.DS_Store
+Thumbs.db

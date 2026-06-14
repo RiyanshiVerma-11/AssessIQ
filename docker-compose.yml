@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  assessiq:
+    build: .
+    container_name: assessiq_app
+    ports:
+      - "8085:8085"
+    volumes:
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./test_groq.py:/app/test_groq.py
+    restart: unless-stopped

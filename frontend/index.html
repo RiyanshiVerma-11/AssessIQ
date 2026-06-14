@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AssessIQ - The future of intelligent, secure, and fair examination platforms.">
+    <title>AssessIQ | Smart & Secure Assessments</title>
+    <!-- Chart.js for Enterprise Data Visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <!-- MediaPipe FaceMesh & Camera Utils (Pinned Versions for Stability) -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+    <script>
+        // Prevent Flash of Unstyled Content (FOUC) for Dark Mode
+        (function() {
+            var theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <style>
+        .live-pulse {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: var(--success, #22c55e);
+            border-radius: 50%;
+            margin-left: 8px;
+            animation: pulse-animation 1.5s infinite;
+        }
+        @keyframes pulse-animation {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+    </style>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app-container">
+        <!-- Sidebar Navigation (Hidden during active exams) -->
+        <aside id="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">Q</div>
+                <span class="logo-text">AssessIQ</span>
+            </div>
+            
+            <nav style="flex-grow: 1;">
+                <ul class="sidebar-menu">
+                    <li class="menu-item active" id="menu-home" data-view="landing">
+                        <a>
+                            <svg viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                            <span class="menu-item-text">Home Landing</span>
+                        </a>
+                    </li>
+                    <!-- Candidate Menu Items -->
+                    <li class="menu-item" id="menu-lobby" data-view="candidate-lobby">
+                        <a>
+                            <svg viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"/><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
+                            <span class="menu-item-text">Student Lobby</span>
+                        </a>
+                    </li>
+                    <!-- Educator Menu Items -->
+                    <li class="menu-item" id="menu-educator" data-view="educator-dashboard">
+                        <a>
+                            <svg viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                            <span class="menu-item-text">Educator Hub</span>
+                        </a>
+                    </li>
+                    <li class="menu-item" id="menu-proctor" data-view="educator-proctor">
+                        <a>
+                            <svg viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            <span class="menu-item-text">Live Proctoring</span>
+                        </a>
+                    </li>
+                    <li class="menu-item" id="menu-analytics" data-view="educator-analytics">
+                        <a>
+                            <svg viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2"/></svg>
+                            <span class="menu-item-text">Exam Analytics</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-widget">
+                    <div class="user-avatar" id="user-avatar-tag">JD</div>
+                    <div class="user-info">
+                        <span class="user-name" id="user-display-name">Judge Demo</span>
+                        <span class="user-role" id="user-display-role">Guest Evaluator</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Main Layout Area -->
+        <main id="main-wrapper">
+            <!-- Header -->
+            <header id="header">
+                <div class="header-search">
+                    <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-width="2" stroke-linecap="round"/></svg>
+                    <input type="text" placeholder="Quick search exams, candidates...">
+                </div>
+                
+                <div class="header-actions">
+                    <div class="badge badge-success" style="font-size: 0.8rem; gap: 8px;">
+                        <span class="recording-dot" style="background-color: var(--success)"></span>
+                        Proctor Engine: Active
+                    </div>
+                    
+                    <button class="theme-toggle-btn" id="theme-toggle" title="Toggle Light/Dark Theme">
+                        <!-- Sun Icon (shown in dark theme) -->
+                        <svg id="theme-sun" viewBox="0 0 24 24" style="display:none;"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m11.314 11.314l.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+                        <!-- Moon Icon (shown in light theme) -->
+                        <svg id="theme-moon" viewBox="0 0 24 24"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                    </button>
+                    
+                    <button class="btn btn-secondary" id="portal-toggle-btn" style="padding: 8px 18px; font-size: 0.85rem;">
+                        Switch to Educator
+                    </button>
+                </div>
+            </header>
+            
+            <!-- Main Content Container -->
+            <div class="view-content" id="view-container">
+                
+                <!-- 1. LANDING VIEW -->
+                <section id="view-landing" class="app-view">
+                    <div class="hero-section">
+                        <div class="hero-text">
+                            <div class="hero-badge-container">
+                                <span class="hero-tag">✨ Next-Generation AI Assessment Platform</span>
+                            </div>
+                            <h1 class="hero-title">Intelligent & Secure<br><span class="gradient-text">Exam Workspaces</span></h1>
+                            <p class="hero-subtitle">AssessIQ delivers a fair testing environment with on-device AI proctoring and adaptive assessments.</p>
+                            <div class="hero-buttons">
+                                <button class="btn btn-primary btn-glow" onclick="app.switchView('candidate-lobby')">Student Demo</button>
+                                <button class="btn btn-outline" onclick="app.switchView('educator-dashboard')">Educator Console</button>
+                            </div>
+                        </div>
+                        <div class="card" style="padding: 30px; display: flex; flex-direction: column; justify-content: center; gap: 20px;">
+                            <h3 style="text-align: center; margin-bottom: 10px;">Select Your Demo Path</h3>
+                            <div class="portal-card card card-hover" onclick="app.switchRole('candidate')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)"><path d="M12 14l9-5-9-5-9 5 9 5z" stroke-width="2"/><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" stroke-width="2"/></svg>
+                                <div>
+                                    <h4>Enter as Candidate</h4>
+                                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">Experience adaptive tests and live secure proctoring tracking.</p>
+                                </div>
+                            </div>
+                            <div class="portal-card card card-hover" onclick="app.switchRole('educator')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="var(--secondary)"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-width="2"/></svg>
+                                <div>
+                                    <h4>Enter as Educator</h4>
+                                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">Build assessments with AI, check candidate feeds, and view grades.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-grid">
+                        <div class="card feature-card">
+                            <div class="feature-icon-wrapper" style="background: var(--danger-glow); color: var(--danger);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            </div>
+                            <h3>Secure Environment</h3>
+                            <p style="color: var(--text-secondary); font-size: 0.9rem;">Hardened browser integration tracks visibility loss, tab switches, copy-paste blockades, and multi-monitor setups instantly.</p>
+                        </div>
+                        <div class="card feature-card">
+                            <div class="feature-icon-wrapper" style="background: var(--success-glow); color: var(--success);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            </div>
+                            <h3>Fair AI Proctoring</h3>
+                            <p style="color: var(--text-secondary); font-size: 0.9rem;">Real-time gaze deflection mapping, object detection (cellphone/books), ambient voice flags, and multi-face cheat score analytics.</p>
+                        </div>
+                        <div class="card feature-card">
+                            <div class="feature-icon-wrapper" style="background: var(--primary-glow); color: var(--primary);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                            </div>
+                            <h3>Intelligent Assessments</h3>
+                            <p style="color: var(--text-secondary); font-size: 0.9rem;">Adaptive difficulty adjustment, custom AI exam construction based on prompts, and automated semantic rubric matching for evaluation.</p>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- 2. STUDENT LOBBY VIEW -->
+                <section id="view-candidate-lobby" class="app-view" style="display:none;">
+                    <div class="exam-lobby-header">
+                        <div>
+                            <h2>Assigned Assessments</h2>
+                            <p style="color: var(--text-secondary);">Select an exam from your dashboard to begin the security check.</p>
+                        </div>
+                        <div class="badge badge-primary">System Integrity: OK</div>
+                    </div>
+                    
+                    <div class="exam-grid" id="student-exam-grid">
+                        <!-- Dynamic Exam Cards Inserted Here -->
+                    </div>
+                </section>
+                
+                <!-- 3. ACTIVE EXAM ROOM VIEW -->
+                <section id="view-candidate-exam" class="app-view" style="display:none; max-width: 100%;">
+                    <div class="exam-layout">
+                        <!-- Question Sheet -->
+                        <div class="exam-question-area">
+                            <div class="exam-question-header">
+                                <span id="exam-title-badge" style="font-weight: 700; font-size: 1.1rem; color: var(--primary);">Exam Title</span>
+                                <div style="display: flex; align-items: center; gap: 16px;">
+                                    <span class="badge badge-primary" id="exam-timer-widget">Time: 45:00</span>
+                                    <span class="badge badge-success" id="question-progress-badge">Q 1/5</span>
+                                </div>
+                            </div>
+                            
+                            <div class="question-body" id="active-question-container">
+                                <!-- Rendered active question -->
+                            </div>
+                            
+                            <div class="exam-question-footer">
+                                <button class="btn btn-secondary" id="btn-prev-question" onclick="app.prevQuestion()">Previous</button>
+                                <button class="btn btn-primary" id="btn-next-question" onclick="app.nextQuestion()">Next & Save</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Proctoring Sidebar -->
+                        <div class="exam-proctor-sidebar">
+                            <!-- Live Camera Monitor -->
+                            <div class="card" style="padding: 16px;">
+                                <h4 style="margin-bottom: 10px; font-size: 0.9rem; display: flex; align-items: center; justify-content: space-between;">
+                                    AI Proctoring Feed
+                                    <span class="badge badge-success" id="student-security-status" style="font-size: 0.65rem;">SECURE</span>
+                                </h4>
+                                
+                                <div class="webcam-monitor" id="student-webcam-monitor">
+                                    <div class="webcam-status-bar">
+                                        <div class="webcam-tag"><span class="recording-dot"></span> LIVE</div>
+                                        <div class="webcam-tag" id="webcam-gaze-tag">GAZE: CENTER</div>
+                                    </div>
+                                    <video class="webcam-video" id="student-webcam-video" autoplay playsinline muted></video>
+                                    <canvas class="webcam-canvas" id="student-webcam-canvas"></canvas>
+                                    
+                                    <!-- Graceful failure overlay -->
+                                    <div class="webcam-fallback" id="webcam-fallback-screen" style="display: none;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/>
+                                        </svg>
+                                        <h4 style="color: var(--danger);">Camera Revoked / Locked</h4>
+                                        <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 6px;">Integrity failure: Video stream interrupted. Admin notified immediately.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Adaptive Graph Vector -->
+                            <div class="card" style="padding: 16px;">
+                                <h4 style="font-size: 0.9rem;">Adaptive System Indicator</h4>
+                                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">Real-time question difficulty path.</p>
+                                <div class="adaptive-chart-wrapper">
+                                    <canvas id="adaptive-vector-canvas" style="width: 100%; height: 100%;"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- Security Integrity Log (Local user view) -->
+                            <div class="card sec-status-panel" style="padding: 16px;">
+                                <h4 style="font-size: 0.9rem;">Local Integrity History</h4>
+                                <ul class="sec-status-list" id="student-integrity-logs">
+                                    <!-- Logs -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- 4. EDUCATOR DASHBOARD -->
+                <section id="view-educator-dashboard" class="app-view" style="display:none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div>
+                            <h2>Educator Admin Hub</h2>
+                            <p style="color: var(--text-secondary);">Re-imagine your evaluation pipelines, track tests, and use AI support tools.</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="app.openAiBuilder()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                            AI Exam Creator
+                        </button>
+                    </div>
+                    
+                    <!-- Metrics Summary Row -->
+                    <div class="metrics-row">
+                        <div class="card metric-card">
+                            <div class="metric-icon" style="background: var(--primary-glow); color: var(--primary);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            </div>
+                            <div class="metric-details">
+                                <span class="metric-value">99.4%</span>
+                                <span class="metric-label">Integrity Index</span>
+                            </div>
+                        </div>
+                        <div class="card metric-card">
+                            <div class="metric-icon" style="background: var(--success-glow); color: var(--success);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87m-4-12a4 4 0 010 7.75"/></svg>
+                            </div>
+                            <div class="metric-details">
+                                <span class="metric-value" id="metrics-active-candidates">1</span>
+                                <span class="metric-label">Online Candidates</span>
+                            </div>
+                        </div>
+                        <div class="card metric-card">
+                            <div class="metric-icon" style="background: var(--warning-glow); color: var(--warning);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/></svg>
+                            </div>
+                            <div class="metric-details">
+                                <span class="metric-value" id="metrics-flags-count" style="color: var(--danger);">0</span>
+                                <span class="metric-label">Active Flags</span>
+                            </div>
+                        </div>
+                        <div class="card metric-card">
+                            <div class="metric-icon" style="background: var(--secondary-glow); color: var(--secondary);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 17h6M9 12h6M9 7h6"/></svg>
+                            </div>
+                            <div class="metric-details">
+                                <span class="metric-value">4</span>
+                                <span class="metric-label">Exams Configured</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="panel-grid-3-2">
+                        <!-- Active Exams List & Chart -->
+                        <div class="card" style="display: flex; flex-direction: column;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <h3>Platform Assessment Status</h3>
+                                <div style="width: 150px; height: 40px;">
+                                    <canvas id="dashboard-trend-chart"></canvas>
+                                </div>
+                            </div>
+                            <div style="overflow-x: auto;">
+                                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                                    <thead>
+                                        <tr style="border-bottom: 2px solid var(--border); color: var(--text-secondary); font-size: 0.85rem;">
+                                            <th style="padding: 12px 16px;">Assessment</th>
+                                            <th style="padding: 12px 16px;">Registered</th>
+                                            <th style="padding: 12px 16px;">Completed</th>
+                                            <th style="padding: 12px 16px;">Avg Score</th>
+                                            <th style="padding: 12px 16px;">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="educator-exams-table-body">
+                                        <!-- Dynamic admin table rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- AI Insights summary panel -->
+                        <div class="card" style="display: flex; flex-direction: column; gap: 20px;">
+                            <h3>Security & AI Insights</h3>
+                            <div style="display: flex; flex-direction: column; gap: 14px;">
+                                <div style="display: flex; gap: 14px; align-items: flex-start; padding: 12px; background: var(--bg-card-hover); border-radius: 8px;">
+                                    <span style="font-size: 1.5rem; line-height: 1;">🔒</span>
+                                    <div>
+                                        <h4 style="font-size: 0.9rem;">Browser Locking</h4>
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">Integrity modules successfully blocked 12 navigation events across all runs today.</p>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 14px; align-items: flex-start; padding: 12px; background: var(--bg-card-hover); border-radius: 8px;">
+                                    <span style="font-size: 1.5rem; line-height: 1;">🧠</span>
+                                    <div>
+                                        <h4 style="font-size: 0.9rem;">Adaptive Testing Load <span class="live-pulse"></span></h4>
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">The intelligent item bank balanced questioning difficulty parameters automatically for candidates.</p>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 14px; align-items: flex-start; padding: 12px; background: var(--bg-card-hover); border-radius: 8px;">
+                                    <span style="font-size: 1.5rem; line-height: 1;">📹</span>
+                                    <div>
+                                        <h4 style="font-size: 0.9rem;">Webcam Health <span class="live-pulse"></span></h4>
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">Real-time gaze check algorithms reported normal status on 98.2% of sessions.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- 5. LIVE PROCTORING VIEW -->
+                <section id="view-educator-proctor" class="app-view" style="display:none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div>
+                            <h2>Live Assessment Monitor</h2>
+                            <p style="color: var(--text-secondary);">Real-time monitoring panel displaying current student video logs and live security streams.</p>
+                        </div>
+                        <div class="badge badge-danger" style="gap: 8px;" id="proctor-anomaly-indicator">
+                            No Anomalies
+                        </div>
+                    </div>
+                    
+                    <div class="proctor-grid" id="proctor-grid-container">
+                        <!-- Dynamic Student Cards containing camera overlays and flags status -->
+                    </div>
+                </section>
+                
+                <!-- 6. EXAM ANALYTICS VIEW -->
+                <section id="view-educator-analytics" class="app-view" style="display:none;">
+                    <div>
+                        <h2>Assessment Analytics Dashboard</h2>
+                        <p style="color: var(--text-secondary);">Examine the grade distributions, question discrimination coefficients, and candidate statistics.</p>
+                    </div>
+                    
+                    <div class="panel-grid-2">
+                        <!-- Grade Distribution Chart -->
+                        <div class="card">
+                            <h3 style="margin-bottom: 20px;">Score Distributions (Historical)</h3>
+                            <div style="height: 250px; width: 100%;">
+                                <canvas id="analytics-score-distribution-chart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- AI Rubric semantic matcher panel -->
+                        <div class="card">
+                            <h3 style="margin-bottom: 20px;">AI Grading Integrity Inspector</h3>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">This inspector compares student typed responses against reference model answers using semantic token mapping.</p>
+                            <div style="display:flex; flex-direction:column; gap:12px;">
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label>Select Sample Candidate Response</label>
+                                    <select id="analytics-candidate-selector" onchange="app.changeAnalyticsSample()">
+                                        <option value="stu1">Jane Doe (JavaScript Closures Response)</option>
+                                        <option value="stu2">Bob Smith (React Hooks Response)</option>
+                                    </select>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px;">
+                                    <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+                                        <h5 style="font-size: 0.8rem; margin-bottom: 6px; color: var(--primary);">Candidate Written Text</h5>
+                                        <p style="font-size: 0.8rem;" id="analytics-candidate-answer">"Closures are functions that reference variables from an outer scope, which gets retained even after execution."</p>
+                                    </div>
+                                    <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+                                        <h5 style="font-size: 0.8rem; margin-bottom: 6px; color: var(--secondary);">Model Solution Rubric</h5>
+                                        <p style="font-size: 0.8rem;" id="analytics-model-rubric">"A closure is the combination of a function bundled together with references to its surrounding state (lexical environment)."</p>
+                                    </div>
+                                </div>
+                                <div style="padding: 12px; background: var(--success-glow); border: 1px dashed var(--success); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                                    <div>
+                                        <h5 style="font-size: 0.85rem; color: var(--success);">Semantic Compatibility Match</h5>
+                                        <p style="font-size: 0.75rem; color: var(--text-secondary);">Identified matching key terms: Lexical, Outer Scope, Variable references.</p>
+                                    </div>
+                                    <div style="font-size: 1.5rem; font-weight: 800; color: var(--success);" id="analytics-match-percentage">89%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+            </div>
+        </main>
+    </div>
+    
+    <!-- Modals -->
+    <!-- 1. AI Exam Builder Modal -->
+    <div class="modal-overlay" id="modal-ai-builder">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Create New Exam with AI</h3>
+                <button onclick="app.closeModal('modal-ai-builder')" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-secondary);">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="ai-generator-form" onsubmit="app.generateExam(event)">
+                    <div class="form-group">
+                        <label for="ai-exam-title">Exam Title</label>
+                        <input type="text" id="ai-exam-title" placeholder="e.g. Adv JavaScript Patterns" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ai-exam-prompt">AI Prompt / Subject Area</label>
+                        <textarea id="ai-exam-prompt" rows="3" placeholder="Instruct the AI: e.g. Create an exam on JavaScript Closures, Promises, and Execution Contexts." required></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ai-exam-questions">Number of Items</label>
+                            <select id="ai-exam-questions">
+                                <option value="3">3 Items (Fast Demo)</option>
+                                <option value="5" selected>5 Items (Standard)</option>
+                                <option value="10">10 Items (Comprehensive)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ai-exam-difficulty">Adaptive Start Difficulty</label>
+                            <select id="ai-exam-difficulty">
+                                <option value="easy">Beginner (Level 1)</option>
+                                <option value="medium" selected>Intermediate (Level 3)</option>
+                                <option value="hard">Advanced (Level 5)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 14px;">Generate Assessment Engine</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Security System Violation Popup Overlay for Student Portal -->
+    <div class="modal-overlay" id="modal-security-lockout" style="z-index: 500;">
+        <div class="modal" style="border: 2px solid var(--danger);">
+            <div class="modal-header" style="background: var(--danger-light); color: var(--danger);">
+                <h3 style="display:flex; align-items:center; gap:10px;">
+                    ⚠️ Security Breach Detected
+                </h3>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p style="font-weight: 700; margin-bottom: 12px;" id="lockout-violation-title">Focus Loss Flagged</p>
+                <p style="font-size: 0.9rem; color: var(--text-secondary);" id="lockout-violation-desc">The examination tab lost priority or focus. This activity has been logged on the Educator Live Control dashboard under high-severity anomaly detection.</p>
+                
+                <div style="margin: 20px 0; padding: 14px; background: var(--bg-app); border: 1px solid var(--border); border-radius: 8px;">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 800;">Logged Incident Timestamp</div>
+                    <div style="font-family: monospace; font-size: 1.1rem; font-weight: bold; margin-top: 4px; color: var(--danger);" id="lockout-timestamp">--:--:--</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="app.dismissLockout()">I Understand, Resume Exam</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FLOATING PRESENTATION DEMO PANEL -->
+    <div id="demo-control-panel">
+        <div class="demo-panel-header" onclick="app.toggleDemoPanel()">
+            <span>Presentation Console</span>
+            <span id="demo-toggle-arrow">▼</span>
+        </div>
+        <div class="demo-panel-content">
+            <div class="demo-panel-section-title">Inject Anomalies (Student Exam)</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="app.demoTriggerViolation('focus-loss')">Tab Switch</button>
+                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="app.demoTriggerViolation('gaze')">Gaze Left</button>
+                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="app.demoTriggerViolation('multiple-faces')">Multi-face</button>
+                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="app.demoTriggerViolation('phone-detected')">Phone Detect</button>
+            </div>
+            
+            <div class="demo-panel-section-title" style="margin-top: 8px;">Revocation Test (Edge Case)</div>
+            <!-- Toggle simulating sudden mid-session hardware failure or settings revocation -->
+            <button class="btn btn-secondary" id="demo-revoke-camera-btn" style="padding: 8px 12px; font-size: 0.75rem; width: 100%; border-color: var(--danger); color: var(--danger); font-weight:700;" onclick="app.demoRevokeCamera()">
+                Simulate Camera Block / Revoke
+            </button>
+            
+            <div class="demo-panel-section-title" style="margin-top: 8px;">Demo Navigation shortcuts</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="app.switchRole('candidate')">Student View</button>
+                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="app.switchRole('educator')">Educator View</button>
+            </div>
+            <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem; width: 100%; margin-top: 4px;" onclick="app.resetDemoData()">Reset All Database Logs</button>
+        </div>
+    </div>
+    
+    <!-- 3. Exam Completion Modal -->
+    <div class="modal-overlay" id="modal-exam-complete" style="z-index: 600;">
+        <div class="modal">
+            <div class="modal-header" style="background: var(--success-light); color: var(--success);">
+                <h3 style="display:flex; align-items:center; gap:10px;">
+                    ✅ Assessment Completed
+                </h3>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <h1 style="font-size: 3.5rem; color: var(--primary); margin: 10px 0; letter-spacing: -2px;" id="completion-score">--%</h1>
+                <p style="font-weight: 700; color: var(--text-primary);">Final AI-Graded Score</p>
+                <div style="margin: 20px 0; padding: 16px; background: var(--bg-app); border: 1px solid var(--border); border-radius: 8px; text-align: left;">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                        AI Detailed Feedback
+                    </div>
+                    <div style="font-size: 0.9rem; color: var(--text-primary); line-height: 1.6;" id="completion-feedback">--</div>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); background: var(--danger-light); padding: 8px; border-radius: 6px; display: inline-block;">
+                    Security Violations Logged: <strong style="color: var(--danger);" id="completion-violations">0</strong>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="app.dismissCompletionModal()">Return to Educator Dashboard</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container" style="position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; gap: 10px;"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+sqlalchemy
+python-dotenv
+websockets
+opencv-python-headless
+mediapipe==0.10.14
+google-generativeai
+pydantic
+jinja2
+python-multipart
+groq

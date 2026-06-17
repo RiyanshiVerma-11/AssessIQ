@@ -2,6 +2,45 @@
 
 AssessIQ is a modern, AI-powered examination platform designed to provide dynamic assessments and ensure academic integrity. It leverages advanced AI models for generating questions, auto-grading subjective answers, and real-time proctoring.
 
+---
+
+### 🚀 Quick Access
+- **Live Demo Link**: [assessiq-z5cg.onrender.com](https://assessiq-z5cg.onrender.com)
+- **Project Presentation**: [AssessIQ.pptx](./AssessIQ.pptx)
+
+---
+
+## 📌 Problem Statement
+
+Traditional online examination systems face major bottlenecks:
+- **Invasive & Heavy Proctoring**: Standard remote proctoring tools stream high-resolution video feeds to central servers. This consumes massive network bandwidth, raises severe privacy concerns, and incurs high server-side GPU costs.
+- **Rote Learning & Exam Leakages**: Static question banks make assessments vulnerable to leakages, encouraging rote memorization rather than testing conceptual mastery.
+- **Delayed & Biased Evaluation**: Grading subjective or essay-type answers manually is slow, expensive, and prone to human bias, delaying student feedback loops.
+
+---
+
+## 💡 Our Solution
+
+**AssessIQ** redefines online testing by combining client-side machine learning with lightning-fast cloud LLMs:
+- **Edge-Based AI Proctoring**: Rather than streaming video feeds, AssessIQ performs real-time face mesh and object detection (like detecting mobile phones) *directly in the user's browser* using MediaPipe and TensorFlow.js. Only lightweight alert packets are sent via WebSockets.
+- **Dynamic Exam Generation**: Using advanced LLMs (Llama 3 via Groq / Gemini), the platform generates unique questions on-demand matching specific topics and difficulty levels.
+- **Instant AI Auto-Grading**: Subjective answers are analyzed instantly by AI, providing a score out of 10 along with detailed, constructive qualitative feedback.
+
+---
+
+## ⚡ What Makes AssessIQ Different?
+
+| Feature | Traditional Proctoring Platforms | **AssessIQ** |
+| :--- | :--- | :--- |
+| **Proctoring Load** | High server load (video streaming + cloud GPU analysis) | Zero server video load (runs on client's CPU/GPU via WebGL) |
+| **Data Privacy** | Streams raw video feeds to third-party databases/servers | Video stays on client device; only lightweight alert logs are sent |
+| **Bandwidth Usage** | High bandwidth required (unstable on poor connections) | Extremely low (lightweight JSON over WebSockets) |
+| **Question Variety** | Fixed question pools (prone to answer sharing/leakage) | Fully dynamic, infinite variation tailored to difficulty |
+| **Subjective Grading** | Manual grading (takes days, inconsistent results) | Instant AI semantic grading with feedback in <1 second |
+| **Setup Cost** | Heavy enterprise setup & subscription fees | Lightweight, dockerized, open-source stack |
+
+---
+
 ## Features
 
 - **Dynamic Question Generation**: Automatically generates unique exam questions across various topics and difficulty levels using the Groq API (Llama 3).

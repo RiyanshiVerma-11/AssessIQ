@@ -45,6 +45,7 @@ class AssessIQ {
     async init() {
         this.applyTheme(this.currentTheme);
         this.setupEventListeners();
+        this.initSlideshow();
         
         if (this.authToken) {
             await this.loadExams();
@@ -315,6 +316,18 @@ class AssessIQ {
                 }
             }
         });
+
+        // Back to top scroll listener
+        window.addEventListener('scroll', () => {
+            const btn = document.getElementById('back-to-top-btn');
+            if (btn) {
+                if (window.scrollY > 300) {
+                    btn.classList.add('visible');
+                } else {
+                    btn.classList.remove('visible');
+                }
+            }
+        });
     }
 
     connectWebSocket() {
@@ -529,6 +542,7 @@ class AssessIQ {
         // Hide main navigation sidebar during active examination lockdown to simulate real lockdown
         const sidebar = document.getElementById('sidebar');
         const mainWrapper = document.getElementById('main-wrapper');
+        const viewContainer = document.getElementById('view-container');
         
         if (viewId === 'candidate-exam' || viewId === 'landing') {
             sidebar.style.display = 'none';
@@ -537,6 +551,10 @@ class AssessIQ {
             mainWrapper.style.marginLeft = '0px';
             mainWrapper.style.width = '100%';
             document.getElementById('header').style.display = 'none'; // fully remove header for immersion
+            if (viewContainer) {
+                viewContainer.style.padding = '0';
+                viewContainer.style.maxWidth = '100%';
+            }
         } else {
             sidebar.style.display = 'flex';
             sidebar.style.transform = 'none';
@@ -544,6 +562,10 @@ class AssessIQ {
             mainWrapper.style.marginLeft = '';
             mainWrapper.style.width = '';
             document.getElementById('header').style.display = 'flex';
+            if (viewContainer) {
+                viewContainer.style.padding = '';
+                viewContainer.style.maxWidth = '';
+            }
         }
 
         // Initialize Analytics Chart when opening Analytics View
@@ -1581,6 +1603,124 @@ class AssessIQ {
                 }
             }
         });
+    }
+
+    // Slideshow Carousel Methods
+    initSlideshow() {
+        this.currentSlide = 0;
+        this.totalSlides = 4;
+        this.showSlide(this.currentSlide);
+    }
+
+    showSlide(index) {
+        const slides = document.querySelectorAll('.slide-card');
+        const dots = document.querySelectorAll('.slide-dot');
+        if (slides.length === 0) return;
+        
+        slides.forEach(slide => slide.classList.remove('active'));
+        dots.forEach(dot => dot.classList.remove('active'));
+        
+        this.currentSlide = (index + this.totalSlides) % this.totalSlides;
+        
+        slides[this.currentSlide].classList.add('active');
+        if (dots[this.currentSlide]) {
+            dots[this.currentSlide].classList.add('active');
+        }
+    }
+
+    nextSlide() {
+        this.showSlide(this.currentSlide + 1);
+    }
+
+    prevSlide() {
+        this.showSlide(this.currentSlide - 1);
+    }
+
+    goToSlide(index) {
+        this.showSlide(index);
+    }
+
+    // Architecture Visualizer Methods
+    showArchDetails(nodeId) {
+        const nodes = document.querySelectorAll('.arch-node-item');
+        nodes.forEach(node => node.classList.remove('active'));
+        
+        const targetNode = document.getElementById(`arch-node-${nodeId}`);
+        if (targetNode) {
+            targetNode.classList.add('active');
+        }
+        
+        const detailBadge = document.getElementById('arch-detail-badge');
+        const detailTitle = document.getElementById('arch-detail-title');
+        const detailDesc = document.getElementById('arch-detail-desc');
+        const detailTech = document.getElementById('arch-detail-tech');
+        
+        if (!detailTitle || !detailDesc || !detailTech) return;
+        
+        const details = {
+            client: {
+                badge: "Frontend Node",
+                title: "Examinee Client Browser",
+                desc: "The candidate browser loads MediaPipe FaceMesh to track user facial metrics (yaw, pitch, roll) and Coco-SSD to track object classes like mobile phones. Computations happen client-side without sending video frames, saving 99% bandwidth and preserving absolute privacy.",
+                tech: "Tech Stack: MediaPipe, TensorFlow.js, WebGL, Vanilla JS"
+            },
+            websockets: {
+                badge: "Transport Layer",
+                title: "WebSockets Real-time Channel",
+                desc: "Whenever an anomaly is detected on the client browser (e.g. gaze shift or phone detected), a lightweight JSON log packet is immediately sent over a WebSocket connection to the backend, enabling live supervisor alerts with near-zero latency.",
+                tech: "Tech Stack: WebSockets (native browser), FastAPI WebSocket API"
+            },
+            backend: {
+                badge: "Backend Controller",
+                title: "FastAPI Application Server",
+                desc: "Processes exams, manages state machines, and routes requests to the AI LLM layer. It runs native caching and background tasks to handle scores, user registries, and exam data with sub-50ms REST API response times.",
+                tech: "Tech Stack: FastAPI, SQLAlchemy, Uvicorn, Python 3.11"
+            },
+            database: {
+                badge: "Persistence Layer",
+                title: "SQLite Database (WAL Mode)",
+                desc: "Persists candidate profiles, dynamic exams metadata, and detailed proctor logs. By enabling Write-Ahead Logging (WAL), SQLite handles highly concurrent read and write operations without requiring a separate database server container.",
+                tech: "Tech Stack: SQLite, WAL Engine, SQLAlchemy ORM"
+            }
+        };
+        
+        const info = details[nodeId];
+        if (info) {
+            detailBadge.textContent = info.badge;
+            detailTitle.textContent = info.title;
+            detailDesc.textContent = info.desc;
+            detailTech.textContent = info.tech;
+        }
+    }
+
+    // FAQ Accordion Toggle
+    toggleFaq(itemElement) {
+        const isActive = itemElement.classList.contains('active');
+        const allItems = document.querySelectorAll('.faq-item');
+        
+        // Close all items
+        allItems.forEach(item => item.classList.remove('active'));
+        
+        // Open target if it wasn't active
+        if (!isActive) {
+            itemElement.classList.add('active');
+        }
+    }
+
+    // Sign Out / Logout Method
+    logout() {
+        this.authToken = null;
+        this.currentUser = null;
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        if (this.ws) {
+            try { this.ws.close(); } catch(e) {}
+            this.ws = null;
+        }
+        
+        this.switchView('landing');
+        this.showToast('Logged Out', 'You have been signed out successfully.', 'success');
     }
 }
 

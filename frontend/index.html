@@ -91,6 +91,10 @@
                         <span class="user-role" id="user-display-role">Guest Evaluator</span>
                     </div>
                 </div>
+                <button class="btn btn-secondary" id="logout-btn" style="width: 100%; padding: 8px 12px; font-size: 0.8rem; display: flex; justify-content: center; align-items: center; gap: 8px; border-color: rgba(239, 68, 68, 0.2); color: var(--danger);" onclick="app.logout()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--danger);"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Sign Out
+                </button>
             </div>
         </aside>
         
@@ -185,71 +189,321 @@
                 
                 <!-- 1. LANDING VIEW -->
                 <section id="view-landing" class="app-view">
-                    <div class="hero-section">
-                        <div class="hero-text">
-                            <div class="hero-badge-container">
-                                <span class="hero-tag">
-                                    <span class="live-pulse" style="margin-left: 0; margin-right: 8px; width: 6px; height: 6px; background-color: var(--primary);"></span>
-                                    AssessIQ Engine 2.0 Live
-                                </span>
+                    <!-- Navigation Header -->
+                    <header class="landing-nav" style="margin-bottom: 40px; border-radius: 0;">
+                        <div class="landing-nav-logo">
+                            <div class="logo-icon">Q</div>
+                            <span>AssessIQ</span>
+                        </div>
+                        <ul class="landing-nav-links">
+                            <li><a href="#hero">Overview</a></li>
+                            <li><a href="#presentation">Presentation</a></li>
+                            <li><a href="#features">Features</a></li>
+                            <li><a href="#architecture">Architecture</a></li>
+                            <li><a href="#comparison">Compare</a></li>
+                            <li><a href="#faq">FAQ</a></li>
+                        </ul>
+                        <div class="landing-nav-actions">
+                            <button class="btn btn-secondary" onclick="app.openLoginModal('candidate')" style="padding: 8px 16px; font-size: 0.85rem;">Student Demo</button>
+                            <button class="btn btn-primary" onclick="app.openLoginModal('educator')" style="padding: 8px 16px; font-size: 0.85rem;">Educator Hub</button>
+                        </div>
+                    </header>
+
+                    <!-- Hero Section -->
+                    <div class="landing-section" id="hero" style="padding-top: 20px;">
+                        <div class="hero-section">
+                            <div class="hero-text">
+                                <div class="hero-badge-container">
+                                    <span class="hero-tag">
+                                        <span class="live-pulse" style="margin-left: 0; margin-right: 8px; width: 6px; height: 6px; background-color: var(--primary);"></span>
+                                        Hackathon Project - AI Proctoring v2.0
+                                    </span>
+                                </div>
+                                <h1 class="hero-title">Secure & Intelligent<br><span class="gradient-text">Assessments.</span></h1>
+                                <p class="hero-subtitle">Redefining online testing by combining on-device computer vision models with real-time LLM engines. We secure and evaluate examinations locally, preserving student privacy with zero lag.</p>
+                                <div class="hero-buttons">
+                                    <button class="btn btn-primary btn-glow" onclick="app.openLoginModal('candidate')" style="padding: 14px 32px; font-size: 1.05rem;">Start Student Demo</button>
+                                    <button class="btn btn-outline" onclick="app.openLoginModal('educator')" style="padding: 14px 32px; font-size: 1.05rem;">Educator Console</button>
+                                </div>
                             </div>
-                            <h1 class="hero-title">Secure & Intelligent<br><span class="gradient-text">Exam Workspaces.</span></h1>
-                            <p class="hero-subtitle">Experience the future of testing. Our on-device AI proctoring tracks integrity locally while adaptive language models construct challenges on the fly—zero lag, absolute fairness.</p>
-                            <div class="hero-buttons" style="margin-top: 15px;">
-                                <button class="btn btn-primary btn-glow" onclick="app.openLoginModal('candidate')" style="padding: 14px 32px; font-size: 1.05rem;">Start Student Demo</button>
-                                <button class="btn btn-outline" onclick="app.openLoginModal('educator')" style="padding: 14px 32px; font-size: 1.05rem;">Educator Dashboard</button>
+                            
+                            <div class="card" style="padding: 36px; display: flex; flex-direction: column; justify-content: center; gap: 24px; background: linear-gradient(160deg, var(--bg-card), rgba(255,255,255,0.05)); border: 1px solid var(--border); box-shadow: var(--shadow-lg); border-radius: var(--border-radius-lg); position: relative;">
+                                <div class="scanner-laser"></div>
+                                <div>
+                                    <h3 style="font-size: 1.4rem; margin-bottom: 6px;">Select Evaluation Path</h3>
+                                    <p style="font-size: 0.9rem; color: var(--text-secondary);">Test our end-to-end flows as a student examinee or platform admin.</p>
+                                </div>
+                                
+                                <div class="portal-card card card-hover" onclick="app.openLoginModal('candidate')" style="flex-direction: row; text-align: left; align-items: center; padding: 20px; gap: 16px; border: 1px solid var(--border);">
+                                    <div style="background: var(--primary-glow); padding: 14px; border-radius: 12px; color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                                        🎓
+                                    </div>
+                                    <div>
+                                        <h4 style="font-size: 1.1rem; margin-bottom: 4px;">Candidate Workspace</h4>
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">Take dynamic exams monitored by client-side FaceMesh tracking.</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="portal-card card card-hover" onclick="app.openLoginModal('educator')" style="flex-direction: row; text-align: left; align-items: center; padding: 20px; gap: 16px; border: 1px solid var(--border);">
+                                    <div style="background: var(--secondary-glow); padding: 14px; border-radius: 12px; color: var(--secondary); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                                        💼
+                                    </div>
+                                    <div>
+                                        <h4 style="font-size: 1.1rem; margin-bottom: 4px;">Educator Control Hub</h4>
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">Manage exams, generate items via AI, and watch live proctor logs.</p>
+                                    </div>
+                                </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Slide presentation summary -->
+                    <div class="landing-section" id="presentation" style="border-top: 1px solid var(--border);">
+                        <div class="landing-section-header">
+                            <span class="badge badge-primary" style="align-self: center;">Project Showcase</span>
+                            <h2 class="landing-section-title">Presentation Slideshow</h2>
+                            <p class="landing-section-subtitle">Browse through key insights and designs from the project pitch presentation (AssessIQ.pptx).</p>
                         </div>
                         
-                        <div class="card" style="padding: 40px; display: flex; flex-direction: column; justify-content: center; gap: 24px; background: linear-gradient(160deg, var(--bg-card), rgba(255,255,255,0.4)); box-shadow: var(--shadow-md); border-width: 2px;">
-                            <div>
-                                <h3 style="font-size: 1.5rem; margin-bottom: 6px;">Select Demo Path</h3>
-                                <p style="font-size: 0.95rem; color: var(--text-secondary);">Simulate an exam session or manage the entire platform.</p>
+                        <div class="slideshow-container">
+                            <div class="slide-deck">
+                                <!-- Slide 1 -->
+                                <div class="slide-card active" data-slide="0">
+                                    <span class="slide-badge">Slide 1: Problem Statement</span>
+                                    <h3 class="slide-title" style="margin-top: 10px;">The Bottleneck of Legacy Proctoring</h3>
+                                    <p class="slide-content" style="margin-top: 10px;">Standard online examination proctoring streams raw, high-definition video directly to centralized servers for analysis. This consumes massive network bandwidth, raises major compliance and privacy concerns, and results in extremely high cloud compute/GPU costs for institutions.</p>
+                                </div>
+                                <!-- Slide 2 -->
+                                <div class="slide-card" data-slide="1">
+                                    <span class="slide-badge">Slide 2: Technical Approach</span>
+                                    <h3 class="slide-title" style="margin-top: 10px;">Edge-Based Machine Learning</h3>
+                                    <p class="slide-content" style="margin-top: 10px;">AssessIQ performs real-time FaceMesh and object detection directly inside the examinee's browser using MediaPipe and TensorFlow.js. Video frames stay on the client's device; only lightweight JSON telemetry packets (focus loss, phone presence) are transmitted over WebSockets, saving 99% bandwidth.</p>
+                                </div>
+                                <!-- Slide 3 -->
+                                <div class="slide-card" data-slide="2">
+                                    <span class="slide-badge">Slide 3: Infinite Variation</span>
+                                    <h3 class="slide-title" style="margin-top: 10px;">Dynamic Question Bank & Semantic Evaluation</h3>
+                                    <p class="slide-content" style="margin-top: 10px;">Instead of relying on standard static question banks prone to leakages, AssessIQ links with high-speed LLMs (LLaMA 3 / Gemini) to dynamically generate unique challenges. Descriptive written answers are evaluated semantically against marking rubrics, grading and returning reviews in under a second.</p>
+                                </div>
+                                <!-- Slide 4 -->
+                                <div class="slide-card" data-slide="3">
+                                    <span class="slide-badge">Slide 4: System Architecture</span>
+                                    <h3 class="slide-title" style="margin-top: 10px;">Built for Scalability</h3>
+                                    <p class="slide-content" style="margin-top: 10px;">The platform features a decoupled FastAPI backend, standard WebSockets for alerts, and SQLite with WAL enabled to achieve rapid concurrency during peak test sessions. native background tasks and caching engines support sub-50ms server responses.</p>
+                                </div>
                             </div>
                             
-                            <div class="portal-card card card-hover" onclick="app.openLoginModal('candidate')" style="flex-direction: row; text-align: left; align-items: center; padding: 24px; gap: 20px; border: 1px solid var(--border);">
-                                <div style="background: var(--primary-glow); padding: 18px; border-radius: 16px; color: var(--primary); display: flex; align-items: center; justify-content: center;">
-                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 14l9-5-9-5-9 5 9 5z" stroke-width="2"/><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" stroke-width="2"/></svg>
+                            <div class="slide-footer-nav">
+                                <button class="btn btn-secondary" onclick="app.prevSlide()" style="padding: 8px 16px;">Previous Slide</button>
+                                <div class="slide-indicators" id="slide-dots-container">
+                                    <span class="slide-dot active" onclick="app.goToSlide(0)"></span>
+                                    <span class="slide-dot" onclick="app.goToSlide(1)"></span>
+                                    <span class="slide-dot" onclick="app.goToSlide(2)"></span>
+                                    <span class="slide-dot" onclick="app.goToSlide(3)"></span>
                                 </div>
-                                <div>
-                                    <h4 style="font-size: 1.15rem; margin-bottom: 4px;">Candidate Portal</h4>
-                                    <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">Take an AI-generated exam with live local FaceMesh proctoring.</p>
+                                <button class="btn btn-primary" onclick="app.nextSlide()" style="padding: 8px 16px;">Next Slide</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Platform Capabilities Grid -->
+                    <div class="landing-section" id="features" style="border-top: 1px solid var(--border);">
+                        <div class="landing-section-header">
+                            <span class="badge badge-primary" style="align-self: center;">Capabilities</span>
+                            <h2 class="landing-section-title">Core Platform Pillars</h2>
+                            <p class="landing-section-subtitle">Examine the feature-rich tech pillars that make AssessIQ the ideal solution for academic institutions.</p>
+                        </div>
+                        
+                        <div class="landing-feature-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px;">
+                            <div class="card feature-card">
+                                <div class="feature-icon-wrapper" style="background: var(--primary-glow); color: var(--primary); font-size: 1.5rem; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
+                                    🔒
+                                </div>
+                                <h3 style="font-size: 1.2rem; margin-bottom: 8px;">On-Device Proctoring</h3>
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;">Local camera evaluations (gaze tracking, multi-face checking, phone detection) execute client-side via WebGL, avoiding raw video storage risks.</p>
+                            </div>
+                            <div class="card feature-card">
+                                <div class="feature-icon-wrapper" style="background: var(--secondary-glow); color: var(--secondary); font-size: 1.5rem; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
+                                    🧠
+                                </div>
+                                <h3 style="font-size: 1.2rem; margin-bottom: 8px;">Dynamic LLM Generation</h3>
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;">Generates unique test questions matching syllabus requirements dynamically via LLaMA-3 models on Groq, ensuring leakproof evaluations.</p>
+                            </div>
+                            <div class="card feature-card">
+                                <div class="feature-icon-wrapper" style="background: var(--success-glow); color: var(--success); font-size: 1.5rem; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
+                                    ⚡
+                                </div>
+                                <h3 style="font-size: 1.2rem; margin-bottom: 8px;">Semantic AI Grading</h3>
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;">Evaluates descriptive/essay-type answers against standard rubrics instantly, generating semantic matches, scoring, and providing key feedback.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Architecture visualizer -->
+                    <div class="landing-section" id="architecture" style="border-top: 1px solid var(--border);">
+                        <div class="landing-section-header">
+                            <span class="badge badge-primary" style="align-self: center;">Architecture</span>
+                            <h2 class="landing-section-title">Interactive System Flow</h2>
+                            <p class="landing-section-subtitle">Click on the architectural blocks below to view how data flows throughout the platform in real time.</p>
+                        </div>
+                        
+                        <div class="arch-visualizer-container">
+                            <div class="arch-nodes-grid">
+                                <div class="arch-node-item active" onclick="app.showArchDetails('client')" id="arch-node-client">
+                                    <div class="arch-node-icon">💻</div>
+                                    <div>
+                                        <h4 style="margin-bottom: 4px;">1. Client Browser</h4>
+                                        <p style="font-size: 0.75rem; color: var(--text-secondary);">TensorFlow.js models analyze camera frame feeds locally.</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="arch-node-item" onclick="app.showArchDetails('websockets')" id="arch-node-websockets">
+                                    <div class="arch-node-icon">⚡</div>
+                                    <div>
+                                        <h4 style="margin-bottom: 4px;">2. WebSockets Channel</h4>
+                                        <p style="font-size: 0.75rem; color: var(--text-secondary);">Relays secure logs & alert JSON packets instantly.</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="arch-node-item" onclick="app.showArchDetails('backend')" id="arch-node-backend">
+                                    <div class="arch-node-icon">⚙️</div>
+                                    <div>
+                                        <h4 style="margin-bottom: 4px;">3. FastAPI Backend</h4>
+                                        <p style="font-size: 0.75rem; color: var(--text-secondary);">Directs evaluation states and cache pipelines.</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="arch-node-item" onclick="app.showArchDetails('database')" id="arch-node-database">
+                                    <div class="arch-node-icon">💾</div>
+                                    <div>
+                                        <h4 style="margin-bottom: 4px;">4. SQLite (WAL Mode)</h4>
+                                        <p style="font-size: 0.75rem; color: var(--text-secondary);">Fast concurrent telemetry writes for examinees.</p>
+                                    </div>
                                 </div>
                             </div>
                             
-                            <div class="portal-card card card-hover" onclick="app.openLoginModal('educator')" style="flex-direction: row; text-align: left; align-items: center; padding: 24px; gap: 20px; border: 1px solid var(--border);">
-                                <div style="background: var(--secondary-glow); padding: 18px; border-radius: 16px; color: var(--secondary); display: flex; align-items: center; justify-content: center;">
-                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-width="2"/></svg>
-                                </div>
-                                <div>
-                                    <h4 style="font-size: 1.15rem; margin-bottom: 4px;">Educator Console</h4>
-                                    <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">Construct dynamic tests and monitor live candidate WebSockets.</p>
+                            <div class="arch-node-detail-card" id="arch-details-box">
+                                <span class="badge badge-primary" style="align-self: flex-start;" id="arch-detail-badge">Frontend Node</span>
+                                <h3 style="font-size: 1.4rem;" id="arch-detail-title">Examinee Client Browser</h3>
+                                <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6;" id="arch-detail-desc">The candidate browser loads MediaPipe FaceMesh to track user facial metrics (yaw, pitch, roll) and Coco-SSD to track object classes like mobile phones. Computations happen client-side without sending video frames, saving 99% bandwidth and preserving absolute privacy.</p>
+                                <div style="background: var(--bg-app); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.75rem; color: var(--text-secondary);" id="arch-detail-tech">
+                                    Tech Stack: MediaPipe, TensorFlow.js, WebGL, Vanilla JS
                                 </div>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Trust, Technology & System Info Footer -->
-                    <div style="margin-top: 50px; padding: 24px 0; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 100%; text-align: center;">
-                        <div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 24px; font-size: 0.82rem; color: var(--text-secondary);">
-                            <span style="display: flex; align-items: center; gap: 6px;">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--danger);"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                                <strong>LockDown Engine:</strong> Active browser environment verification
-                            </span>
-                            <span style="display: flex; align-items: center; gap: 6px;">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--success);"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                <strong>FaceMesh Proctoring:</strong> Local gaze & multi-face analysis
-                            </span>
-                            <span style="display: flex; align-items: center; gap: 6px;">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--primary);"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-                                <strong>AI Grading:</strong> LLaMA-3 Semantic Rubric Matcher
-                            </span>
+
+                    <!-- Comparison Table -->
+                    <div class="landing-section" id="comparison" style="border-top: 1px solid var(--border);">
+                        <div class="landing-section-header">
+                            <span class="badge badge-primary" style="align-self: center;">Comparison</span>
+                            <h2 class="landing-section-title">Why Choose AssessIQ</h2>
+                            <p class="landing-section-subtitle">Contrast legacy remote testing practices with the edge-oriented design of AssessIQ.</p>
                         </div>
-                        <div style="font-size: 0.78rem; opacity: 0.8; font-weight: 500; color: var(--text-secondary);">
-                            &copy; 2026 AssessIQ &bull; Enterprise Assessment Workspace
+                        
+                        <div class="comparison-table-wrapper">
+                            <table class="comparison-table">
+                                <thead>
+                                    <tr>
+                                        <th>Metric Criteria</th>
+                                        <th>Traditional Proctoring Systems</th>
+                                        <th style="color: var(--primary);">AssessIQ Solution</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>Server Computation Load</strong></td>
+                                        <td>High (Raw video decoding + cloud GPU tracking)</td>
+                                        <td class="highlight-col" style="color: var(--success); font-weight: 700;">Zero video load (runs on user's WebGL context)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Student Privacy Control</strong></td>
+                                        <td>Streams continuous personal video files to cloud storage</td>
+                                        <td class="highlight-col" style="color: var(--success); font-weight: 700;">100% Privacy (Frames are analyzed in browser RAM, never stored)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Bandwidth Dependency</strong></td>
+                                        <td>Requires 2-5 Mbps upstream (fails on poor internet)</td>
+                                        <td class="highlight-col" style="color: var(--success); font-weight: 700;">Requires < 500 bps (only simple text flags sent)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Question Variety & Protection</strong></td>
+                                        <td>Static question pools (highly vulnerable to answers leakages)</td>
+                                        <td class="highlight-col" style="color: var(--success); font-weight: 700;">Adaptive, on-the-fly randomizations via LLM</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Evaluation Feedbacks</strong></td>
+                                        <td>Manual reviews taking several days to score essay tests</td>
+                                        <td class="highlight-col" style="color: var(--success); font-weight: 700;">Sub-second AI grading with qualitative reviews</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
+
+                    <!-- FAQ Accordions -->
+                    <div class="landing-section" id="faq" style="border-top: 1px solid var(--border);">
+                        <div class="landing-section-header">
+                            <span class="badge badge-primary" style="align-self: center;">Help Center</span>
+                            <h2 class="landing-section-title">Frequently Asked Questions</h2>
+                            <p class="landing-section-subtitle">Explore answers to common questions about our architecture, privacy models, and performance.</p>
+                        </div>
+                        
+                        <div class="faq-container">
+                            <div class="faq-item" onclick="app.toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>How does client-side proctoring protect student privacy?</span>
+                                    <span class="faq-chevron">▼</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <div class="faq-answer-inner">
+                                        Unlike standard systems that upload your webcam stream to enterprise servers, AssessIQ performs the computer vision calculations directly inside your browser. No video frames leave your device. Only simple alert packets, like "anomaly: student focus loss", are transmitted via WebSockets to notify the educator.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="app.toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>Is AI semantic grading consistent and fair?</span>
+                                    <span class="faq-chevron">▼</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <div class="faq-answer-inner">
+                                        Yes. AssessIQ evaluates descriptive/essay questions based on semantic token mappings and concept checks, comparing student answers against educator rubrics. It scores based on conceptual understanding rather than keyword stuffing, eliminating standard human grading bias and fatigue.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="app.toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>Does proctoring work on low-spec hardware?</span>
+                                    <span class="faq-chevron">▼</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <div class="faq-answer-inner">
+                                        Yes. The models used (MediaPipe FaceMesh and Coco-SSD) are compile-optimized for WebGL acceleration. They utilize the candidate's built-in graphics engine, achieving smooth 25-30 frames per second checks on average modern notebooks without causing CPU slowdowns.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer -->
+                    <div style="margin-top: 60px; padding: 40px 20px; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; font-size: 0.9rem;">
+                        <div style="display: flex; gap: 24px; font-weight: 600; color: var(--text-secondary);">
+                            <a href="#hero">Overview</a>
+                            <a href="./AssessIQ.pptx" download>Download Slides</a>
+                            <a href="https://assessiq-z5cg.onrender.com" target="_blank">Live App</a>
+                        </div>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); max-width: 500px; line-height: 1.5;">
+                            AssessIQ &copy; 2026. Made with Vanilla HTML/CSS/JS and FastAPI. MIT Licensed.
+                        </p>
+                    </div>
+
+                    <!-- Back to top floating button -->
+                    <div id="back-to-top-btn" class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">▲</div>
                 </section>
+
                 
                 <!-- 2. STUDENT LOBBY VIEW -->
                 <section id="view-candidate-lobby" class="app-view" style="display:none;">
